@@ -1,0 +1,52 @@
+workflows:
+  ios-workflow:
+    name: iOS Agriturismo Build
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+    
+    scripts:
+      - name: Set Flutter version
+        script: |
+          flutter --version
+          
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+          
+      - name: Analyze code
+        script: |
+          flutter analyze
+          
+      - name: Build iOS (unsigned for AltStore)
+        script: |
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r app-unsigned.ipa Payload
+          cd ../../..
+          mkdir -p artifacts
+          cp build/ios/iphoneos/app-unsigned.ipa artifacts/agriturismo-app.ipa
+          
+    artifacts:
+      - artifacts/*.ipa
+      
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
