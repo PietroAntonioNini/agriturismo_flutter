@@ -18,9 +18,11 @@ class SelectApartmentPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authProvider.notifier).logout();
-              Navigator.pop(context);
+            onPressed: () async {
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
             },
             tooltip: 'Logout',
           ),

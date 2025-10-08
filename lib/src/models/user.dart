@@ -30,15 +30,20 @@ class User {
       id: json['id'] as int,
       username: json['username'] as String,
       email: json['email'] as String,
-      firstName: json['firstName'] as String,
-      lastName: json['lastName'] as String,
+      // Il backend restituisce first_name/last_name, non firstName/lastName
+      firstName: (json['firstName'] ?? json['first_name']) as String,
+      lastName: (json['lastName'] ?? json['last_name']) as String,
       role: json['role'] as String,
-      isActive: json['isActive'] as bool,
-      lastLogin: json['lastLogin'] != null 
-          ? DateTime.parse(json['lastLogin'] as String)
+      // Il backend restituisce is_active, non isActive
+      isActive: (json['isActive'] ?? json['is_active']) as bool,
+      // Il backend restituisce last_login, non lastLogin
+      lastLogin: (json['lastLogin'] ?? json['last_login']) != null 
+          ? DateTime.parse((json['lastLogin'] ?? json['last_login']) as String)
           : null,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      // Il backend restituisce created_at, non createdAt
+      createdAt: DateTime.parse((json['createdAt'] ?? json['created_at']) as String),
+      // Il backend restituisce updated_at, non updatedAt  
+      updatedAt: DateTime.parse((json['updatedAt'] ?? json['updated_at']) as String),
     );
   }
 

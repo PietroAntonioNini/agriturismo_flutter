@@ -1,113 +1,75 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'api_client.dart';
+import 'auth_service.dart';
+import '../models/user.dart';
 
 /// Base URL backend su Koyeb
 const baseUrl = 'https://flat-damselfly-agriturismo-backend-47075869.koyeb.app';
 
-/// Provider singleton per ApiClient
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient(baseUrl));
+/// Provider singleton per AuthService
+final authServiceProvider = Provider<AuthService>((ref) => AuthService(baseUrl));
+
+/// Provider singleton per ApiClient (integrato con AuthService)
+final apiClientProvider = Provider<ApiClient>((ref) {
+  final authService = ref.read(authServiceProvider);
+  return ApiClient(baseUrl, authService);
+});
 
 // ============================================================================
 // AUTH PROVIDERS
 // ============================================================================
 
-/// Stato autenticazione con access token
+/// Stato autenticazione con utente completo
 class AuthState {
+  final User? user;
   final String? accessToken;
-  const AuthState(this.accessToken);
+  
+  const AuthState({this.user, this.accessToken});
 
-  bool get isAuthenticated => accessToken != null;
+  bool get isAuthenticated => user != null && accessToken != null;
 }
 
 /// Notifier per gestione autenticazione
 class AuthNotifier extends Notifier<AuthState> {
-  late final ApiClient _client;
+  late final AuthService _authService;
 
   @override
   AuthState build() {
-    _client = ref.read(apiClientProvider);
-    return const AuthState(null);
+    _authService = ref.read(authServiceProvider);
+    
+    // Carica lo stato dall'storage all'avvio
+    _loadStoredAuth();
+    
+    return const AuthState();
   }
 
-  /// Effettua login e recupera user profile
-  /// Segue il flusso del frontend Angular con fallback robusto:
-  /// 1. Login con username/password → ottieni token
-  /// 2. Salva access token
-  /// 3. TENTA di recuperare user profile (può fallire se endpoint non esiste)
-  /// 4. Se tutti i tentativi falliscono, usa userId = 1 come fallback temporaneo
-  /// 5. Richiedi CSRF token (necessario per POST/PUT/DELETE)
+  /// Carica autenticazione dal storage
+  Future<void> _loadStoredAuth() async {
+    await _authService.loadStoredAuth();
+    final isLoggedIn = await _authService.isLoggedIn();
+    
+    if (isLoggedIn) {
+      final user = _authService.getCurrentUser();
+      final token = _authService.getAccessToken();
+      
+      if (user != null && token != null) {
+        state = AuthState(user: user, accessToken: token);
+      }
+    }
+  }
+
+  /// Effettua login completo seguendo il flusso Angular
   Future<void> login(String username, String password) async {
-    // Step 1: Login per ottenere i token
-    final data = await _client.login(username, password);
-    final token = data['accessToken'] as String;
-    _client.setAccessToken(token);
+    final user = await _authService.login(username, password);
+    final token = _authService.getAccessToken();
     
-    // Step 2: TENTA di recuperare il profilo utente (con user ID)
-    int? userId;
-    
-    // Tentativo 1: /api/auth/verify-token
-    try {
-      final userProfile = await _client.verifyToken();
-      if (userProfile['id'] != null) {
-        userId = userProfile['id'] as int;
-        print('✅ User profile loaded from verify-token. User ID: $userId');
-      }
-    } catch (e) {
-      print('⚠️ verify-token failed: $e');
-    }
-    
-    // Tentativo 2: /api/users/me (se il primo fallisce o non ha id)
-    if (userId == null) {
-      try {
-        final userProfile = await _client.getUserProfile();
-        if (userProfile['id'] != null) {
-          userId = userProfile['id'] as int;
-          print('✅ User profile loaded from /users/me. User ID: $userId');
-        }
-      } catch (e) {
-        print('⚠️ getUserProfile failed: $e');
-      }
-    }
-    
-    // Tentativo 3: Controlla se il login ha restituito user info
-    if (userId == null && data['user'] != null) {
-      final user = data['user'] as Map<String, dynamic>;
-      if (user['id'] != null) {
-        userId = user['id'] as int;
-        print('✅ User ID extracted from login response: $userId');
-      }
-    }
-    
-    // Fallback finale: Se TUTTI i tentativi falliscono, usa un valore di default
-    // NOTA: Questo è temporaneo finché non scopriamo l'endpoint corretto
-    if (userId == null) {
-      print('⚠️ WARNING: Could not retrieve user ID from any endpoint!');
-      print('💡 Using fallback user ID = 1');
-      userId = 1; // Assumiamo che l'utente loggato sia id=1
-    }
-    
-    _client.setUserId(userId);
-    
-    // Step 3: Ottieni CSRF token (necessario per operazioni POST/PUT/DELETE)
-    try {
-      final csrfToken = await _client.getCsrfToken();
-      _client.setCsrfToken(csrfToken);
-      print('✅ CSRF token obtained successfully');
-    } catch (e) {
-      // CSRF token fetch fallito, ma continua comunque
-      print('⚠️ Warning: Could not fetch CSRF token: $e');
-    }
-    
-    state = AuthState(token);
-    print('🎉 Login completed successfully!');
+    state = AuthState(user: user, accessToken: token);
   }
 
-  /// Logout (pulizia stato locale)
-  void logout() {
-    _client.setAccessToken(null);
-    _client.setUserId(null);
-    _client.setCsrfToken(null);
-    state = const AuthState(null);
+  /// Logout (pulizia stato locale e storage)
+  Future<void> logout() async {
+    await _authService.logout();
+    state = const AuthState();
   }
 }
 
@@ -120,10 +82,16 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(
 // DATA PROVIDERS
 // ============================================================================
 
-/// Provider per lista appartamenti
+/// Provider per lista appartamenti (richiede autenticazione)
 final apartmentsProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
+  // Verifica autenticazione
+  final authState = ref.watch(authProvider);
+  if (!authState.isAuthenticated) {
+    throw Exception('User not authenticated');
+  }
+
   final client = ref.read(apiClientProvider);
   final list = await client.getApartments();
   return List<Map<String, dynamic>>.from(list);
@@ -133,6 +101,12 @@ final apartmentsProvider = FutureProvider<List<Map<String, dynamic>>>((
 final utilityTypesProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
+  // Verifica autenticazione
+  final authState = ref.watch(authProvider);
+  if (!authState.isAuthenticated) {
+    throw Exception('User not authenticated');
+  }
+
   final client = ref.read(apiClientProvider);
   final list = await client.getUtilityTypes();
   return List<Map<String, dynamic>>.from(list);
