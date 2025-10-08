@@ -28,8 +28,8 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
     super.initState();
     // Reset selezioni quando si apre la pagina
     Future.microtask(() {
-      ref.read(selectedTypeProvider.notifier).state = 'electricity';
-      ref.read(selectedSubtypeProvider.notifier).state = null;
+      ref.read(selectedTypeProvider.notifier).set('electricity');
+      ref.read(selectedSubtypeProvider.notifier).set(null);
     });
   }
 
@@ -71,7 +71,11 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
     }
 
     // Ottieni ultima lettura
-    final lastReading = lastReadingAsync.valueOrNull;
+    final lastReading = switch (lastReadingAsync) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
+    
     if (lastReading == null) {
       setState(
         () => _errorMessage = 'Errore: impossibile recuperare ultima lettura',
@@ -220,9 +224,9 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
               ],
               selected: {type},
               onSelectionChanged: (selected) {
-                ref.read(selectedTypeProvider.notifier).state = selected.first;
+                ref.read(selectedTypeProvider.notifier).set(selected.first);
                 // Reset sottotipo quando cambia tipo
-                ref.read(selectedSubtypeProvider.notifier).state = null;
+                ref.read(selectedSubtypeProvider.notifier).set(null);
                 _currentReadingController.clear();
                 setState(() {
                   _consumption = 0;
@@ -247,8 +251,8 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
                 ],
                 selected: {subtype ?? 'main'},
                 onSelectionChanged: (selected) {
-                  ref.read(selectedSubtypeProvider.notifier).state =
-                      selected.first;
+                  ref.read(selectedSubtypeProvider.notifier).set(
+                      selected.first);
                   _currentReadingController.clear();
                   setState(() {
                     _consumption = 0;
@@ -365,10 +369,10 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF43A047).withOpacity(0.1),
+                            color: const Color(0xFF43A047).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: const Color(0xFF43A047).withOpacity(0.3),
+                              color: const Color(0xFF43A047).withValues(alpha: 0.3),
                             ),
                           ),
                           child: Column(

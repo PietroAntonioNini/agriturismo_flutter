@@ -20,9 +20,14 @@ class AuthState {
 }
 
 /// Notifier per gestione autenticazione
-class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._client) : super(const AuthState(null));
-  final ApiClient _client;
+class AuthNotifier extends Notifier<AuthState> {
+  late final ApiClient _client;
+
+  @override
+  AuthState build() {
+    _client = ref.read(apiClientProvider);
+    return const AuthState(null);
+  }
 
   /// Effettua login e salva access token
   Future<void> login(String username, String password) async {
@@ -40,10 +45,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
 /// Provider per stato autenticazione
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final client = ref.read(apiClientProvider);
-  return AuthNotifier(client);
-});
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);
 
 // ============================================================================
 // DATA PROVIDERS
@@ -72,13 +76,40 @@ final utilityTypesProvider = FutureProvider<List<Map<String, dynamic>>>((
 // ============================================================================
 
 /// ID appartamento selezionato
-final selectedApartmentIdProvider = StateProvider<int?>((ref) => null);
+final selectedApartmentIdProvider = NotifierProvider<_SelectedApartmentIdNotifier, int?>(
+  _SelectedApartmentIdNotifier.new,
+);
+
+class _SelectedApartmentIdNotifier extends Notifier<int?> {
+  @override
+  int? build() => null;
+  
+  void set(int? value) => state = value;
+}
 
 /// Tipo utility selezionato (electricity, water, gas)
-final selectedTypeProvider = StateProvider<String>((ref) => 'electricity');
+final selectedTypeProvider = NotifierProvider<_SelectedTypeNotifier, String>(
+  _SelectedTypeNotifier.new,
+);
+
+class _SelectedTypeNotifier extends Notifier<String> {
+  @override
+  String build() => 'electricity';
+  
+  void set(String value) => state = value;
+}
 
 /// Sottotipo utility selezionato (main, laundry) - solo per apt 8
-final selectedSubtypeProvider = StateProvider<String?>((ref) => null);
+final selectedSubtypeProvider = NotifierProvider<_SelectedSubtypeNotifier, String?>(
+  _SelectedSubtypeNotifier.new,
+);
+
+class _SelectedSubtypeNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  
+  void set(String? value) => state = value;
+}
 
 // ============================================================================
 // LAST READING PROVIDER (dipende da selezioni correnti)

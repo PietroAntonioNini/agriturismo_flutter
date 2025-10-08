@@ -40,15 +40,15 @@ class SelectApartmentPage extends ConsumerWidget {
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: apartments.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final apt = apartments[index];
                 return _ApartmentCard(
                   apartment: apt,
                   onTap: () {
                     // Imposta appartamento selezionato e naviga
-                    ref.read(selectedApartmentIdProvider.notifier).state =
-                        apt['id'] as int;
+                    ref.read(selectedApartmentIdProvider.notifier).set(
+                        apt['id'] as int);
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const AddReadingPage()),
@@ -155,7 +155,7 @@ class _ApartmentCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
+                      color: statusColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
