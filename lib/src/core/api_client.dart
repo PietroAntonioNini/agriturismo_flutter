@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 class ApiClient {
   final String baseUrl;
   String? _accessToken;
+  String? _csrfToken;
+  int? _userId;
 
   ApiClient(this.baseUrl);
 
@@ -14,14 +16,28 @@ class ApiClient {
     _accessToken = token;
   }
 
+  /// Imposta il CSRF token per operazioni di modifica (POST/PUT/DELETE)
+  void setCsrfToken(String? token) {
+    _csrfToken = token;
+  }
+
+  /// Imposta l'ID utente corrente (obbligatorio per query API)
+  void setUserId(int? userId) {
+    _userId = userId;
+  }
+
   /// Headers comuni per richieste HTTP
-  Map<String, String> _headers({bool json = true}) => {
-    if (json) 'Content-Type': 'application/json',
-    if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
-  };
+  Map<String, String> _headers({bool json = true, bool needsCsrf = false}) {
+    final headers = <String, String>{};
+    if (json) headers['Content-Type'] = 'application/json';
+    if (_accessToken != null) headers['Authorization'] = 'Bearer $_accessToken!';
+    if (needsCsrf && _csrfToken != null) headers['X-CSRF-Token'] = _csrfToken!;
+    return headers;
+  }
 
   /// Login con username e password
   /// Returns: {accessToken, refreshToken, tokenType, expiresIn}
+  /// NOTA: NON restituisce l'user ID! Usa verifyToken() dopo il login per ottenerlo
   Future<Map<String, dynamic>> login(String username, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login');
     final res = await http.post(
@@ -36,15 +52,47 @@ class ApiClient {
     throw Exception('Login failed: ${res.statusCode} ${res.body}');
   }
 
+  /// Verifica il token e recupera il profilo utente completo (con user ID)
+  /// Questo è l'endpoint primario per ottenere l'user ID dopo il login
+  Future<Map<String, dynamic>> verifyToken() async {
+    final url = Uri.parse('$baseUrl/api/auth/verify-token');
+    final res = await http.get(url, headers: _headers());
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Verify token failed: ${res.statusCode} ${res.body}');
+  }
+
+  /// Recupera il profilo utente (fallback per verify-token)
+  /// Restituisce: {id, username, email, firstName, lastName, role, isActive, ...}
+  Future<Map<String, dynamic>> getUserProfile() async {
+    final url = Uri.parse('$baseUrl/api/users/me');
+    final res = await http.get(url, headers: _headers());
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Get user profile failed: ${res.statusCode} ${res.body}');
+  }
+
   /// Ottiene lista appartamenti
+  /// IMPORTANTE: Richiede user_id come query parameter
   Future<List<dynamic>> getApartments() async {
-    final url = Uri.parse('$baseUrl/apartments');
+    if (_userId == null) {
+      throw Exception('User ID is required. Call setUserId() after login.');
+    }
+    
+    // URL con trailing slash + query parameter user_id
+    final url = Uri.parse('$baseUrl/apartments/').replace(
+      queryParameters: {'user_id': _userId.toString()},
+    );
     final res = await http.get(url, headers: _headers());
 
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List<dynamic>;
     }
-    throw Exception('Get apartments failed: ${res.statusCode}');
+    throw Exception('Get apartments failed: ${res.statusCode} - ${res.body}');
   }
 
   /// Ottiene tipi di utility disponibili (electricity, water, gas)
@@ -94,13 +142,23 @@ class ApiClient {
 
   /// Crea una nuova lettura utility
   /// Returns: la lettura creata con id e timestamp
+  /// IMPORTANTE: Richiede CSRF token e user_id
   Future<Map<String, dynamic>> createReading(
     Map<String, dynamic> payload,
   ) async {
-    final url = Uri.parse('$baseUrl/utilities');
+    if (_userId == null) {
+      throw Exception('User ID is required. Call setUserId() after login.');
+    }
+    
+    // URL con trailing slash + query parameter user_id
+    final url = Uri.parse('$baseUrl/utilities/').replace(
+      queryParameters: {'user_id': _userId.toString()},
+    );
+    
+    // Headers con CSRF token (necessario per POST)
     final res = await http.post(
       url,
-      headers: _headers(),
+      headers: _headers(needsCsrf: true),
       body: jsonEncode(payload),
     );
 
@@ -120,5 +178,17 @@ class ApiClient {
     }
 
     throw Exception(errorMessage);
+  }
+
+  /// Ottiene il CSRF token dal server (da chiamare dopo login)
+  Future<String> getCsrfToken() async {
+    final url = Uri.parse('$baseUrl/api/auth/csrf-token');
+    final res = await http.get(url, headers: _headers());
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data['csrf_token'] as String;
+    }
+    throw Exception('Get CSRF token failed: ${res.statusCode} - ${res.body}');
   }
 }
