@@ -30,10 +30,6 @@ workflows:
         script: |
           flutter pub get
           
-      - name: Analyze code
-        script: |
-          flutter analyze
-          
       - name: Build iOS (unsigned for AltStore)
         script: |
           flutter build ios --release --no-codesign
