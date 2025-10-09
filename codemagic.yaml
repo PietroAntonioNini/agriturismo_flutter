@@ -49,8 +49,6 @@ workflows:
     
     environment:
       flutter: stable
-      android_signing:
-        - agriturismo_keystore
       
     triggering:
       events:
@@ -73,7 +71,7 @@ workflows:
         script: |
           flutter build apk --debug
           
-      - name: Build Android APK (release)
+      - name: Build Android APK (release - unsigned)
         script: |
           flutter build apk --release
           
