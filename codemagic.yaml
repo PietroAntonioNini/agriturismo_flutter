@@ -44,7 +44,7 @@ workflows:
   # Workflow per Android (APK non firmato per distribuzione diretta)
   android-workflow:
     name: Android Agriturismo Build
-    instance_type: linux
+    instance_type: mac_mini_m2
     max_build_duration: 30
     
     environment:
@@ -67,14 +67,9 @@ workflows:
         script: |
           flutter pub get
           
-      - name: Build Android APK (debug)
-        script: |
-          flutter build apk --debug
-          
-      - name: Build Android APK (release - unsigned)
+      - name: Build Android APK (release)
         script: |
           flutter build apk --release
           
     artifacts:
-      - build/app/outputs/flutter-apk/app-debug.apk
       - build/app/outputs/flutter-apk/app-release.apk
