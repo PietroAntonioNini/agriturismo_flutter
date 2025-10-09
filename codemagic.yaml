@@ -1,4 +1,5 @@
 workflows:
+  # Workflow per iOS (AltStore - non firmato)
   ios-workflow:
     name: iOS Agriturismo Build
     instance_type: mac_mini_m2
@@ -22,10 +23,6 @@ workflows:
           flutter --version
           flutter doctor
           
-      - name: Fix dependencies
-        script: |
-          flutter pub upgrade --major-versions
-          
       - name: Get Flutter packages
         script: |
           flutter pub get
@@ -43,3 +40,43 @@ workflows:
           
     artifacts:
       - agriturismo-app.ipa
+      
+  # Workflow per Android (APK non firmato per distribuzione diretta)
+  android-workflow:
+    name: Android Agriturismo Build
+    instance_type: linux_x2
+    max_build_duration: 30
+    
+    environment:
+      flutter: stable
+      android_signing:
+        - agriturismo_keystore
+      
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+    
+    scripts:
+      - name: Set Flutter version
+        script: |
+          flutter --version
+          flutter doctor
+          
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+          
+      - name: Build Android APK (debug)
+        script: |
+          flutter build apk --debug
+          
+      - name: Build Android APK (release)
+        script: |
+          flutter build apk --release
+          
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
+      - build/app/outputs/flutter-apk/app-release.apk

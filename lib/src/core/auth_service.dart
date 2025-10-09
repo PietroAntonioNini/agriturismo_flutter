@@ -197,7 +197,7 @@ class AuthService {
     final headers = <String, String>{};
     
     if (_accessToken != null) {
-      headers['Authorization'] = 'Bearer $_accessToken!';
+      headers['Authorization'] = 'Bearer $_accessToken';
     }
     
     if (needsCsrf && _csrfToken != null) {

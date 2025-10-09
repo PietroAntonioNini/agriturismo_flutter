@@ -53,7 +53,9 @@ class SelectApartmentPage extends ConsumerWidget {
                         apt['id'] as int);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const AddReadingPage()),
+                      MaterialPageRoute(
+                        builder: (_) => AddReadingPage(apartment: apt),
+                      ),
                     );
                   },
                 );

@@ -8,7 +8,9 @@ import '../core/providers.dart';
 /// Form unico con validazione real-time e feedback immediato
 /// Supporta sottotipo lavanderia per appartamento 8
 class AddReadingPage extends ConsumerStatefulWidget {
-  const AddReadingPage({super.key});
+  final Map<String, dynamic> apartment;
+  
+  const AddReadingPage({super.key, required this.apartment});
 
   @override
   ConsumerState<AddReadingPage> createState() => _AddReadingPageState();
@@ -123,38 +125,39 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
         'isSpecialReading': false,
       };
 
-      final created = await ref.read(apiClientProvider).createReading(payload);
+      await ref.read(apiClientProvider).createReading(payload);
 
       if (mounted) {
-        // Mostra conferma
-        await showDialog<void>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            icon: const Icon(
-              Icons.check_circle,
-              color: Color(0xFF43A047),
-              size: 64,
+        // Mostra notifica successo con SnackBar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Lettura salvata! Consumo: ${_consumption.toStringAsFixed(2)} - €${_totalCost.toStringAsFixed(2)}',
+                  ),
+                ),
+              ],
             ),
-            title: const Text('Lettura salvata'),
-            content: Text(
-              'Lettura #${created['id']} salvata con successo!\n\n'
-              'Consumo: ${_consumption.toStringAsFixed(2)}\n'
-              'Totale: €${_totalCost.toStringAsFixed(2)}',
-              textAlign: TextAlign.center,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Chiudi'),
-              ),
-            ],
+            backgroundColor: const Color(0xFF43A047),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
           ),
         );
 
-        // Torna alla lista appartamenti
-        if (mounted) {
-          Navigator.pop(context);
-        }
+        // Reset form per permettere inserimento di un'altra lettura
+        _currentReadingController.clear();
+        setState(() {
+          _consumption = 0;
+          _totalCost = 0;
+          _errorMessage = null;
+        });
+
+        // Invalida il provider per ricaricare l'ultima lettura
+        ref.invalidate(lastReadingProvider);
       }
     } catch (e) {
       setState(() => _errorMessage = 'Errore: ${e.toString()}');
@@ -180,22 +183,21 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Info appartamento
-            if (aptId != null)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.home, color: Color(0xFF1E88E5)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Appartamento ID: $aptId',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.home, color: Color(0xFF1E88E5)),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.apartment['name'] ?? 'Appartamento ${widget.apartment['id']}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
               ),
+            ),
             const SizedBox(height: 16),
 
             // Selettore tipo utility
@@ -325,10 +327,19 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
                           controller: _currentReadingController,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
+                            signed: false,
                           ),
                           inputFormatters: [
+                            // Permette numeri, punto e virgola
                             FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d*'),
+                              RegExp(r'^\d*[.,]?\d*'),
+                            ),
+                            // Converte virgola in punto per la validazione
+                            TextInputFormatter.withFunction(
+                              (oldValue, newValue) {
+                                final text = newValue.text.replaceAll(',', '.');
+                                return newValue.copyWith(text: text);
+                              },
                             ),
                           ],
                           decoration: InputDecoration(
@@ -348,10 +359,19 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
                           controller: _unitCostController,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
+                            signed: false,
                           ),
                           inputFormatters: [
+                            // Permette numeri, punto e virgola
                             FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d*'),
+                              RegExp(r'^\d*[.,]?\d*'),
+                            ),
+                            // Converte virgola in punto per la validazione
+                            TextInputFormatter.withFunction(
+                              (oldValue, newValue) {
+                                final text = newValue.text.replaceAll(',', '.');
+                                return newValue.copyWith(text: text);
+                              },
                             ),
                           ],
                           decoration: const InputDecoration(

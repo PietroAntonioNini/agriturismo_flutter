@@ -22,38 +22,10 @@ class ApiClient {
     return headers;
   }
 
-  /// Costruisce URI con user_id automatico per le risorse che lo richiedono
-  Uri _buildResourceUri(String path, {Map<String, String>? queryParams}) {
-    final params = queryParams ?? <String, String>{};
-    
-    // Aggiungi user_id se necessario e disponibile
-    final userId = _authService.getUserId();
-    if (userId != null && _requiresUserId(path)) {
-      params['user_id'] = userId.toString();
-    }
-    
-    return Uri.parse('$baseUrl$path').replace(queryParameters: params);
-  }
-
-  /// Verifica se l'endpoint richiede user_id
-  bool _requiresUserId(String path) {
-    return path.contains('/apartments') ||
-           path.contains('/tenants') ||
-           path.contains('/leases') ||
-           path.contains('/invoices') ||
-           path.contains('/utilities');
-  }
-
   /// Ottiene lista appartamenti
-  /// IMPORTANTE: Richiede user_id come query parameter (aggiunto automaticamente)
+  /// Il backend estrae automaticamente user_id dal token JWT
   Future<List<dynamic>> getApartments() async {
-    final userId = _authService.getUserId();
-    if (userId == null) {
-      throw Exception('User not logged in or user ID not available');
-    }
-    
-    // URL con trailing slash + query parameter user_id (automatico)
-    final url = _buildResourceUri('/apartments/');
+    final url = Uri.parse('$baseUrl/apartments/');
     final res = await http.get(url, headers: _headers());
 
     if (res.statusCode == 200) {
@@ -109,17 +81,12 @@ class ApiClient {
 
   /// Crea una nuova lettura utility
   /// Returns: la lettura creata con id e timestamp
-  /// IMPORTANTE: Richiede CSRF token e user_id (aggiunti automaticamente)
+  /// Il backend estrae automaticamente user_id dal token JWT
+  /// IMPORTANTE: Richiede CSRF token per POST
   Future<Map<String, dynamic>> createReading(
     Map<String, dynamic> payload,
   ) async {
-    final userId = _authService.getUserId();
-    if (userId == null) {
-      throw Exception('User not logged in or user ID not available');
-    }
-    
-    // URL con trailing slash + query parameter user_id (automatico)
-    final url = _buildResourceUri('/utilities/');
+    final url = Uri.parse('$baseUrl/utilities/');
     
     // Headers con CSRF token (necessario per POST)
     final res = await http.post(
