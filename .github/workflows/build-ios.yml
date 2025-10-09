@@ -1,36 +1,57 @@
 name: Build iOS App
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   build-ios:
     runs-on: macos-latest
     
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
       
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.3'
+        flutter-version: '3.22.0'
         channel: 'stable'
+        cache: true
         
-    - name: Flutter Doctor
-      run: flutter doctor -v
-        
-    - name: Clean and get dependencies
+    - name: Update pubspec for iOS compatibility
       run: |
-        flutter clean
-        flutter pub get
+        cat > pubspec.yaml << EOF
+        name: agriturismo_flutter
+        description: "Agriturismo Manager App"
+        publish_to: 'none'
+        version: 1.0.0+1
         
-    - name: Disable analytics
-      run: flutter config --no-analytics
+        environment:
+          sdk: '>=3.0.0 <4.0.0'
+        
+        dependencies:
+          flutter:
+            sdk: flutter
+          flutter_riverpod: ^2.4.9
+          http: ^1.1.0
+          intl: ^0.18.1
+          flutter_secure_storage: ^9.0.0
+        
+        dev_dependencies:
+          flutter_test:
+            sdk: flutter
+          flutter_lints: ^3.0.0
+        
+        flutter:
+          uses-material-design: true
+        EOF
+        
+    - name: Get dependencies
+      run: flutter pub get
       
-    - name: Build iOS app (without codesign)
+    - name: Build iOS (without codesign)
       run: flutter build ios --release --no-codesign
       
     - name: Create IPA
@@ -38,11 +59,11 @@ jobs:
         cd build/ios/iphoneos
         mkdir -p Payload
         cp -R Runner.app Payload/
-        zip -r ../../../agriturismo_flutter.ipa Payload/
+        zip -r agriturismo_flutter.ipa Payload/
+        mv agriturismo_flutter.ipa ../../../
         
-    - name: Upload IPA artifact
+    - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
         name: agriturismo_flutter_ios
         path: agriturismo_flutter.ipa
-        retention-days: 30
