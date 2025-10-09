@@ -5,8 +5,8 @@ workflows:
     max_build_duration: 30
     
     environment:
-      flutter: 3.22.0
-      xcode: 15.0
+      flutter: stable
+      xcode: latest
       cocoapods: default
       
     triggering:
@@ -20,6 +20,11 @@ workflows:
       - name: Set Flutter version
         script: |
           flutter --version
+          flutter doctor
+          
+      - name: Fix dependencies
+        script: |
+          flutter pub upgrade --major-versions
           
       - name: Get Flutter packages
         script: |
