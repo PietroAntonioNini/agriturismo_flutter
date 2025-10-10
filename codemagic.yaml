@@ -67,17 +67,23 @@ workflows:
         script: |
           yes | flutter doctor --android-licenses || true
           
-      - name: Get Flutter packages
+      - name: Clean and Get Flutter packages
         script: |
+          flutter clean
           flutter pub get
+          flutter pub upgrade --major-versions
+          
+      - name: Analyze project
+        script: |
+          flutter analyze || true
           
       - name: Build Android APK (debug)
         script: |
-          flutter build apk --debug
+          flutter build apk --debug --verbose
           
       - name: Build Android APK (release)
         script: |
-          flutter build apk --release --no-shrink
+          flutter build apk --release --no-shrink --verbose
           
     artifacts:
       - build/app/outputs/flutter-apk/app-debug.apk
