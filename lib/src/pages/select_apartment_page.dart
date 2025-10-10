@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers.dart';
 import 'add_reading_page.dart';
+import 'recent_readings_page.dart';
 
 /// Pagina di selezione appartamento
 /// Lista tap-to-select minimale e performante
@@ -16,6 +17,18 @@ class SelectApartmentPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Seleziona appartamento'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RecentReadingsPage(),
+                ),
+              );
+            },
+            tooltip: 'Letture recenti',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {

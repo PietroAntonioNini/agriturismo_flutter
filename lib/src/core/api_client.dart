@@ -112,4 +112,65 @@ class ApiClient {
 
     throw Exception(errorMessage);
   }
+
+  /// Ottiene le letture recenti (ultimi 10 giorni)
+  /// Returns: lista di letture ordinate per data decrescente
+  /// Usa l'endpoint esistente /utilities/ con filtro temporale
+  Future<List<dynamic>> getRecentReadings() async {
+    // Calcola la data di 10 giorni fa
+    final now = DateTime.now();
+    final tenDaysAgo = now.subtract(const Duration(days: 10));
+    
+    // Usa l'endpoint esistente con parametro limit=50 per ottenere le letture recenti
+    // Il backend filtra automaticamente per l'utente corrente tramite JWT
+    final url = Uri.parse('$baseUrl/utilities/?limit=50');
+    final res = await http.get(url, headers: _headers());
+
+    if (res.statusCode == 200) {
+      final allReadings = jsonDecode(res.body) as List<dynamic>;
+      
+      // Filtra per data (ultimi 10 giorni) lato client
+      final recentReadings = allReadings.where((reading) {
+        try {
+          final readingDate = DateTime.parse(reading['readingDate'].toString());
+          return readingDate.isAfter(tenDaysAgo);
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+      
+      return recentReadings;
+    }
+    throw Exception('Get recent readings failed: ${res.statusCode} - ${res.body}');
+  }
+
+  /// Elimina una lettura per ID
+  /// Returns: true se eliminazione riuscita
+  /// IMPORTANTE: Richiede CSRF token per DELETE
+  Future<bool> deleteReading(int id) async {
+    final url = Uri.parse('$baseUrl/utilities/$id');
+    
+    // Headers con CSRF token (necessario per DELETE)
+    final res = await http.delete(
+      url,
+      headers: _headers(needsCsrf: true),
+    );
+
+    if (res.statusCode == 200 || res.statusCode == 204) {
+      return true;
+    }
+
+    // Parsing errore dettagliato dal backend
+    String errorMessage = 'Delete reading failed: ${res.statusCode}';
+    try {
+      final errorBody = jsonDecode(res.body);
+      if (errorBody['detail'] != null) {
+        errorMessage = errorBody['detail'].toString();
+      }
+    } catch (_) {
+      errorMessage += ' - ${res.body}';
+    }
+
+    throw Exception(errorMessage);
+  }
 }

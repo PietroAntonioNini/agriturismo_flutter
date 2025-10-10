@@ -18,12 +18,26 @@ class AddReadingPage extends ConsumerStatefulWidget {
 
 class _AddReadingPageState extends ConsumerState<AddReadingPage> {
   final _currentReadingController = TextEditingController();
-  final _unitCostController = TextEditingController(text: '0.22');
+  final _unitCostController = TextEditingController();
 
   String? _errorMessage;
   bool _isLoading = false;
   double _consumption = 0;
   double _totalCost = 0;
+
+  /// Costi di default per ogni tipo di utility
+  String _getDefaultCost(String type) {
+    switch (type) {
+      case 'electricity':
+        return '0.75';
+      case 'gas':
+        return '4.45';
+      case 'water':
+        return '3.40';
+      default:
+        return '0.00';
+    }
+  }
 
   @override
   void initState() {
@@ -32,6 +46,8 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
     Future.microtask(() {
       ref.read(selectedTypeProvider.notifier).set('electricity');
       ref.read(selectedSubtypeProvider.notifier).set(null);
+      // Imposta il costo di default per electricity
+      _unitCostController.text = _getDefaultCost('electricity');
     });
   }
 
@@ -40,6 +56,96 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
     _currentReadingController.dispose();
     _unitCostController.dispose();
     super.dispose();
+  }
+
+  /// Mostra dialog per cambiare appartamento
+  Future<void> _showApartmentSelector(BuildContext context) async {
+    final apartmentsAsync = ref.read(apartmentsProvider);
+    
+    await apartmentsAsync.when(
+      data: (apartments) async {
+        final selected = await showDialog<Map<String, dynamic>>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Seleziona appartamento'),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: apartments.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final apt = apartments[index];
+                  final isCurrentApt = apt['id'] == widget.apartment['id'];
+                  
+                  return ListTile(
+                    leading: Icon(
+                      Icons.home,
+                      color: isCurrentApt ? const Color(0xFF1E88E5) : Colors.grey,
+                    ),
+                    title: Text(
+                      apt['name'] as String,
+                      style: TextStyle(
+                        fontWeight: isCurrentApt ? FontWeight.bold : FontWeight.normal,
+                        color: isCurrentApt ? const Color(0xFF1E88E5) : null,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Piano ${apt['floor']} • ${apt['squareMeters']}m² • ${apt['rooms']} locali',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: isCurrentApt
+                        ? const Icon(Icons.check_circle, color: Color(0xFF43A047))
+                        : null,
+                    selected: isCurrentApt,
+                    onTap: () => Navigator.of(context).pop(apt),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annulla'),
+              ),
+            ],
+          ),
+        );
+
+        // Se ha selezionato un appartamento diverso, sostituisci la pagina corrente
+        if (selected != null && 
+            selected['id'] != widget.apartment['id'] && 
+            context.mounted) {
+          // Imposta il nuovo appartamento selezionato
+          ref.read(selectedApartmentIdProvider.notifier).set(selected['id'] as int);
+          
+          // Sostituisci la pagina corrente con quella del nuovo appartamento
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => AddReadingPage(apartment: selected),
+            ),
+          );
+        }
+      },
+      loading: () {
+        // Mostra loading durante il caricamento
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Caricamento appartamenti...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      },
+      error: (error, _) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore nel caricamento: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      },
+    );
   }
 
   /// Calcola consumo e costo in tempo reale
@@ -182,19 +288,39 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Info appartamento
+            // Info appartamento (cliccabile per cambiare)
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.home, color: Color(0xFF1E88E5)),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.apartment['name'] ?? 'Appartamento ${widget.apartment['id']}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _showApartmentSelector(context),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.home, color: Color(0xFF1E88E5)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.apartment['name'] ?? 'Appartamento ${widget.apartment['id']}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.swap_horiz,
+                        color: Color(0xFF1E88E5),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Cambia',
+                        style: TextStyle(
+                          color: Color(0xFF1E88E5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -211,25 +337,25 @@ class _AddReadingPageState extends ConsumerState<AddReadingPage> {
                 ButtonSegment(
                   value: 'electricity',
                   label: Text('⚡ Luce'),
-                  icon: Icon(Icons.bolt),
                 ),
                 ButtonSegment(
                   value: 'water',
                   label: Text('💧 Acqua'),
-                  icon: Icon(Icons.water_drop),
                 ),
                 ButtonSegment(
                   value: 'gas',
                   label: Text('🔥 Gas'),
-                  icon: Icon(Icons.local_fire_department),
                 ),
               ],
               selected: {type},
               onSelectionChanged: (selected) {
-                ref.read(selectedTypeProvider.notifier).set(selected.first);
+                final newType = selected.first;
+                ref.read(selectedTypeProvider.notifier).set(newType);
                 // Reset sottotipo quando cambia tipo
                 ref.read(selectedSubtypeProvider.notifier).set(null);
                 _currentReadingController.clear();
+                // Aggiorna costo di default in base al tipo
+                _unitCostController.text = _getDefaultCost(newType);
                 setState(() {
                   _consumption = 0;
                   _totalCost = 0;

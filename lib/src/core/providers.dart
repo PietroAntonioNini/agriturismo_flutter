@@ -170,3 +170,23 @@ final lastReadingProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 
   return await client.getLastReading(aptId, type, subtype: subtype);
 });
+
+// ============================================================================
+// RECENT READINGS PROVIDER
+// ============================================================================
+
+/// Provider per letture recenti (ultimi 10 giorni)
+/// Può essere invalidato dopo eliminazione o inserimento nuova lettura
+final recentReadingsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  // Verifica autenticazione
+  final authState = ref.watch(authProvider);
+  if (!authState.isAuthenticated) {
+    throw Exception('User not authenticated');
+  }
+
+  final client = ref.read(apiClientProvider);
+  final list = await client.getRecentReadings();
+  return List<Map<String, dynamic>>.from(list);
+});
