@@ -41,7 +41,7 @@ workflows:
     artifacts:
       - agriturismo-app.ipa
       
-  # Workflow per Android (APK non firmato per distribuzione diretta)
+  # Workflow per Android - APK semplice da installare sul telefono
   android-workflow:
     name: Android Agriturismo Build
     instance_type: mac_mini_m2
@@ -58,33 +58,18 @@ workflows:
           include: true
     
     scripts:
-      - name: Set Flutter version
+      - name: Setup Flutter
         script: |
           flutter --version
           flutter doctor
           
-      - name: Accept Android licenses
+      - name: Get dependencies
         script: |
-          yes | flutter doctor --android-licenses || true
-          
-      - name: Clean and Get Flutter packages
-        script: |
-          flutter clean
           flutter pub get
-          flutter pub upgrade --major-versions
           
-      - name: Analyze project
+      - name: Build APK
         script: |
-          flutter analyze || true
-          
-      - name: Build Android APK (debug)
-        script: |
-          flutter build apk --debug --verbose
-          
-      - name: Build Android APK (release)
-        script: |
-          flutter build apk --release --no-shrink --verbose
+          flutter build apk --release
           
     artifacts:
-      - build/app/outputs/flutter-apk/app-debug.apk
       - build/app/outputs/flutter-apk/app-release.apk
